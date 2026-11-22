@@ -60,6 +60,6 @@ Exports are `data/exports/<account>-<date>-<time>[-N].txt`: a TASK line for Clau
 
 - yt-dlp needs browser impersonation for TikTok (`curl_cffi`, config `impersonate: chrome`). yt-dlp's automatic target breaks profile listing, so a target is always set explicitly.
 - `curl_cffi` has no wheels for 32-bit Python on Windows: use 64-bit Python.
-- OCR preprocessing defaults to `text_mask: white`: only near-white, unsaturated pixels count as text. TikTok captions are white with a dark outline, often karaoke-style with the current word on a colored box; a plain Otsu threshold loses that word (measured on @momentumcash: 88% → 95–97% word recall). `otsu` stays available for other caption styles.
+- OCR preprocessing defaults to `text_mask: white`: only near-white, unsaturated pixels count as text. TikTok captions are white with a dark outline, often karaoke-style with the current word on a colored box; a plain Otsu threshold loses that word (measured on hand-checked clips: 88% → 95–97% word recall). `otsu` stays available for other caption styles.
 - The cleaner also strips OCR specks at line ends, reads `0` inside a word as `O`, and drops lines that are pieces of a recent line.
 - Frame de-duplication compares the busiest 20 px cell (on a 160 px-wide copy), not the whole-frame mean, so a one-word subtitle change on a static background still counts.

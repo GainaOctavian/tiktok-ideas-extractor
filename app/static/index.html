@@ -40,7 +40,7 @@
   <h1>TikTok Ideas Extractor</h1>
 
   <div class="row">
-    <input id="account" aria-label="Account" list="recent" placeholder="account, e.g. momentumcash" style="width:240px" autocomplete="off">
+    <input id="account" aria-label="Account" list="recent" placeholder="TikTok account name" style="width:240px" autocomplete="off">
     <datalist id="recent"></datalist>
     <input id="limit" aria-label="Limit" type="number" min="1" placeholder="limit (optional)" style="width:150px">
     <button id="run" class="primary">Run</button>
@@ -89,7 +89,7 @@ function rememberAccount(a) {
 function loadRecent() {
   const list = JSON.parse(localStorage.getItem("recentAccounts") || "[]");
   $("recent").innerHTML = list.map((a) => `<option value="${a.replace(/"/g, "&quot;")}">`).join("");
-  const fromLink = new URLSearchParams(location.search).get("a");  // bookmarkable: ...&a=momentumcash
+  const fromLink = new URLSearchParams(location.search).get("a");  // bookmarkable: ...&a=youraccount
   if (!account()) $("account").value = fromLink || list[0] || "";
 }
 

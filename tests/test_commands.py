@@ -19,7 +19,7 @@ def run(text, cfg, jobs):
 
 
 def test_parse_line():
-    assert parse_line("  run momentumcash 5 ") == ["run", "momentumcash", "5"]
+    assert parse_line("  run youraccount 5 ") == ["run", "youraccount", "5"]
     assert parse_line('status "@cont"') == ["status", "@cont"]
     assert parse_line("   ") is None
     assert parse_line("# a comment") is None

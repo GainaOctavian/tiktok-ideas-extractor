@@ -15,7 +15,7 @@ For tests or experiments use a scratch config: `--config <tmp>\config.yaml` on b
 
 ## Send lines
 ```powershell
-.\.venv\Scripts\python.exe tiktok_ideas_ctl.py "run momentumcash 5" wait "status momentumcash"
+.\.venv\Scripts\python.exe tiktok_ideas_ctl.py "run youraccount 5" wait "status youraccount"
 .\.venv\Scripts\python.exe tiktok_ideas_ctl.py -f script.txt
 ```
 Exit codes: 0 ok, 1 stopped at an error (`error at line N (<line>): <reason>`), 2 no app listening.
@@ -38,9 +38,9 @@ Accounts: `name`, `@name` (quote it in PowerShell) or a profile URL. `#` starts 
 
 ## Example
 ```
-run momentumcash 3
+run youraccount 3
 wait
-status momentumcash
-export momentumcash
+status youraccount
+export youraccount
 ```
 The page (`tiktok_ideas.py ui`) sends exactly these lines, so anything the buttons do works here too.

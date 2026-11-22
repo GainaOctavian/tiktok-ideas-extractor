@@ -50,7 +50,7 @@ Everything that varies between accounts is in `config.yaml` (subtitle `crop`, `f
 Start the page with `ui --ctl`, then send command lines from another terminal:
 
 ```powershell
-.\.venv\Scripts\python.exe tiktok_ideas_ctl.py "run momentumcash 5" wait "status momentumcash"
+.\.venv\Scripts\python.exe tiktok_ideas_ctl.py "run youraccount 5" wait "status youraccount"
 ```
 
 `help` lists the commands. The page's buttons send the same lines. Details: `.claude/skills/tiktok-ideas/SKILL.md`.

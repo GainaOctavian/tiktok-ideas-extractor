@@ -1,6 +1,6 @@
 """tiktok-ideas-ctl: drive a running `tiktok_ideas.py ui --ctl` with command lines.
 
-  python tiktok_ideas_ctl.py "run momentumcash 5" wait status momentumcash
+  python tiktok_ideas_ctl.py "run youraccount 5" wait status youraccount
   python tiktok_ideas_ctl.py -f script.txt
   "help" | python tiktok_ideas_ctl.py -
 
@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="tiktok_ideas_ctl.py", description="Send command lines to the running UI.")
     p.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     p.add_argument("-f", "--file", help="read lines from a file, or - for stdin")
-    p.add_argument("lines", nargs="*", help='command lines, e.g. "run momentumcash 5" wait')
+    p.add_argument("lines", nargs="*", help='command lines, e.g. "run youraccount 5" wait')
     args = p.parse_args(argv)
     if not args.lines and not args.file:
         print("usage: tiktok_ideas_ctl.py [--config PATH] (LINE ... | -f FILE | -f -); try: help", file=sys.stderr)
