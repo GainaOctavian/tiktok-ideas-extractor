@@ -26,6 +26,7 @@ def status_lines(account: str, cfg: Config) -> list[str]:
             f"@{account}: {c.listed} listed | {c.done + c.exported} processed ({c.low_text} low text) | "
             f"{c.done} unexported | {c.exported} exported | "
             f"{c.failed} failed ({c.failed_final} final) | {c.pending} pending"
+            + (f" | {c.skipped} skipped (photo posts)" if c.skipped else "")
         ]
         lines += [f"failed: {r.id} ({r.attempts}/{cfg.max_attempts}) {r.error}" for r in state.failed(account)]
         if c.failed_final:

@@ -26,6 +26,14 @@ def test_status_lines_match_cli_format(cfg):
     ]
 
 
+def test_status_lines_show_skipped_photo_posts(cfg):
+    seed(cfg, done=["1"])
+    with State(cfg.data_dir / "state.db") as s:
+        s.add_listed("cont", [ClipInfo("9", "u9", None, None)])
+        s.mark_skipped("9", "photo post (no video)")
+    assert status_lines("cont", cfg)[0].endswith("| 0 pending | 1 skipped (photo posts)")
+
+
 def test_status_lines_unknown_account(cfg):
     assert "no clips yet" in status_lines("nobody", cfg)[0]
 

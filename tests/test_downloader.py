@@ -2,7 +2,7 @@ import dataclasses
 
 import pytest
 
-from pipeline.downloader import DownloadError, download
+from pipeline.downloader import DownloadError, PhotoPost, download
 from tests.fakes import FakeYDL
 
 URL = "https://www.tiktok.com/@cont/video/1"
@@ -29,6 +29,31 @@ def test_yt_dlp_messages_silenced(tmp_path, cfg, capsys):
     for level in ("debug", "info", "warning", "error"):
         getattr(logger, level)("ERROR: noisy")
     assert capsys.readouterr() == ("", "")
+
+
+AUDIO_ONLY = {"id": "1", "formats": [{"format_id": "audio", "vcodec": "none", "acodec": "mp3"}]}
+WITH_VIDEO = {
+    "id": "1",
+    "formats": [
+        {"format_id": "audio", "vcodec": "none", "acodec": "mp3"},
+        {"format_id": "h264_720p", "vcodec": "h264", "acodec": "aac", "height": 1280},
+    ],
+}
+
+
+def test_photo_post_detected_without_downloading(tmp_path, cfg):
+    with pytest.raises(PhotoPost):
+        download(URL, tmp_path / "1", cfg, ydl_factory=FakeYDL.configure(info=AUDIO_ONLY))
+    assert list((tmp_path / "1").glob("*")) == []
+
+
+def test_video_post_downloaded(tmp_path, cfg):
+    path = download(URL, tmp_path / "1", cfg, ydl_factory=FakeYDL.configure(info=WITH_VIDEO))
+    assert path.name == "video.mp4"
+
+
+def test_photo_post_is_not_a_download_error():
+    assert not issubclass(PhotoPost, DownloadError)
 
 
 def test_download_failure(tmp_path, cfg):

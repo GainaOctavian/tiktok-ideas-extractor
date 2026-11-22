@@ -15,6 +15,15 @@ class DownloadError(RuntimeError):
     pass
 
 
+class PhotoPost(RuntimeError):
+    """The post is a photo slideshow (only an audio track): nothing to OCR, skip it."""
+
+
+def _is_photo_post(info: dict) -> bool:
+    formats = info.get("formats") or []
+    return bool(formats) and all(f.get("vcodec") in (None, "none") and not f.get("height") for f in formats)
+
+
 def download(url: str, dest_dir: Path, cfg: Config, ydl_factory=yt_dlp.YoutubeDL) -> Path:
     dest_dir.mkdir(parents=True, exist_ok=True)
     opts = {
@@ -27,7 +36,16 @@ def download(url: str, dest_dir: Path, cfg: Config, ydl_factory=yt_dlp.YoutubeDL
     }
     try:
         with ydl_factory(opts) as ydl:
-            ydl.download([url])
+            # look at the formats first (process=False: no format selection yet), so photo posts are never downloaded
+            info = ydl.extract_info(url, download=False, process=False)
+            if info and _is_photo_post(info):
+                raise PhotoPost("photo post (no video)")
+            if info:
+                ydl.process_ie_result(info, download=True)
+            else:
+                ydl.download([url])
+    except PhotoPost:
+        raise
     except Exception as e:
         raise DownloadError(str(e)) from e
 

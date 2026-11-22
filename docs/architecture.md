@@ -29,7 +29,11 @@ stateDiagram-v2
     failed --> failed: retried, failed again (attempts < 3)
     failed --> pending: reset --failed
     done --> exported: export
+    pending --> skipped: photo post (no video)
+    failed --> skipped: photo post (no video)
 ```
+
+Photo posts (slideshows: only an audio track) are detected from the format list before anything is downloaded and marked `skipped`; they are never retried, exported or counted as low text. Databases created before this status are migrated on open (the table is rebuilt with the new `CHECK`).
 
 A clip with 3 failed attempts stays `failed` and is skipped until `reset --failed`.
 

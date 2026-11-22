@@ -24,10 +24,14 @@ class FakeYDL:
     def __exit__(self, *exc):
         return False
 
-    def extract_info(self, url, download=False):
+    def extract_info(self, url, download=False, **kwargs):
         if self.error:
             raise self.error
         return self.info
+
+    def process_ie_result(self, info, download=True):
+        self.download([info])
+        return info
 
     def download(self, urls):
         if self.error:

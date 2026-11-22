@@ -80,6 +80,36 @@ def test_counts(state):
     assert (c.listed, c.pending, c.done, c.failed, c.failed_final, c.exported) == (4, 1, 1, 1, 0, 1)
 
 
+def test_skipped_not_processed_and_counted(state):
+    state.add_listed("a", [clip(1), clip(2)])
+    state.mark_failed("1", "ffmpeg failed")
+    state.mark_skipped("1", "photo post (no video)")
+    assert ids(state.to_process("a", 3)) == ["2"]
+    c = state.counts("a", 3, 20)
+    assert (c.skipped, c.failed, c.pending) == (1, 0, 1)
+    assert state.failed("a") == []
+    assert state.unexported("a") == []
+
+
+def test_old_database_gets_skipped_status(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path)
+    db.executescript(
+        """CREATE TABLE clips (id TEXT PRIMARY KEY, account TEXT NOT NULL, url TEXT NOT NULL, title TEXT,
+        published TEXT, status TEXT NOT NULL CHECK(status IN ('pending','done','failed','exported')),
+        error TEXT, attempts INTEGER NOT NULL DEFAULT 0, chars INTEGER, updated_at TEXT NOT NULL);
+        INSERT INTO clips VALUES ('5','a','u',NULL,NULL,'failed','boom',2,NULL,'t');"""
+    )
+    db.commit()
+    db.close()
+    with State(path) as s:
+        s.mark_skipped("5", "photo post (no video)")
+        assert s.counts("a", 3, 20).skipped == 1
+        assert s.counts("a", 3, 20).listed == 1
+
+
 def test_accounts_are_isolated(state):
     state.add_listed("a", [clip(1)])
     state.add_listed("b", [clip(2)])

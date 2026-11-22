@@ -6,7 +6,7 @@ Windows CLI that lists every clip of a TikTok account, OCRs the on-screen subtit
 
 - `tiktok_ideas.py`: CLI (`run`, `export`, `status`, `reset`, global `--config`). Exit codes 0 ok, 1 fatal, 2 usage, 130 Ctrl+C.
 - `pipeline/config.py`: `Config` + `load_config` (unknown keys rejected, dirs relative to the config file).
-- `pipeline/state.py`: SQLite `State`, `ClipInfo`, `ClipRow`.
+- `pipeline/state.py`: SQLite `State`, `ClipInfo`, `ClipRow`. Statuses: pending, done, failed, exported, skipped (photo posts). Old DBs migrate on open.
 - `pipeline/lister.py` / `downloader.py`: yt-dlp Python API; `base_options` holds the shared options (silent logger, cookies, impersonation).
 - `pipeline/frames.py`, `ocr.py`, `cleaner.py`, `exporter.py`: one step each.
 - `pipeline/runner.py`: per-clip loop; steps injected via `Steps` (fakes in `tests/test_runner.py`); `should_stop` for cooperative stop.

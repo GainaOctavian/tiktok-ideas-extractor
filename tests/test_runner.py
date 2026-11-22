@@ -158,6 +158,29 @@ def test_listing_error_writes_nothing(cfg):
         assert s.counts("cont", 3, 20).listed == 0
 
 
+def test_photo_post_skipped_not_failed(cfg, tmp_path):
+    from pipeline.downloader import PhotoPost
+
+    fakes = Fakes([1, 2])
+    real_download = fakes.download
+
+    def download(url, dest_dir, c):
+        if url.endswith("/1"):
+            raise PhotoPost("photo post (no video)")
+        return real_download(url, dest_dir, c)
+
+    fakes.download = download
+    summary, out = run(cfg, fakes)
+    assert (summary.done, summary.failed, summary.skipped) == (1, 0, 1)
+    assert any(line.endswith("1 skipped: photo post (no video)") for line in out)
+    assert "1 photo posts skipped" in out[-1]
+    with state(cfg) as s:
+        assert s.failed("cont") == [] and s.counts("cont", 3, 20).skipped == 1
+    assert list(cfg.work_dir.iterdir()) == []
+    summary, _ = run(cfg, fakes)
+    assert summary.processed == 0
+
+
 def test_queue_size_logged_before_first_clip(cfg):
     _, out = run(cfg, Fakes([1, 2, 3]), limit=2)
     assert out[0] == "queue: 2 clips"

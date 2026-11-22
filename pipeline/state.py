@@ -38,23 +38,24 @@ class StatusCounts:
     failed_final: int
     exported: int
     low_text: int
+    skipped: int = 0
 
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS clips (
+_TABLE = """
+CREATE TABLE IF NOT EXISTS {name} (
     id TEXT PRIMARY KEY,
     account TEXT NOT NULL,
     url TEXT NOT NULL,
     title TEXT,
     published TEXT,
-    status TEXT NOT NULL CHECK(status IN ('pending','done','failed','exported')),
+    status TEXT NOT NULL CHECK(status IN ('pending','done','failed','exported','skipped')),
     error TEXT,
     attempts INTEGER NOT NULL DEFAULT 0,
     chars INTEGER,
     updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS clips_account_status ON clips(account, status);
 """
+_SCHEMA = _TABLE.format(name="clips") + "CREATE INDEX IF NOT EXISTS clips_account_status ON clips(account, status);"
 
 _COLUMNS = "id, account, url, title, published, status, error, attempts, chars"
 _NEWEST_FIRST = "ORDER BY CAST(id AS INTEGER) DESC"
@@ -70,7 +71,19 @@ class State:
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(db_path)
+        self._migrate()
         self._db.executescript(_SCHEMA)
+
+    def _migrate(self) -> None:
+        """Databases made before the 'skipped' status: rebuild the table with the new CHECK (SQLite can't alter it)."""
+        row = self._db.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'clips'").fetchone()
+        if row is None or "'skipped'" in row[0]:
+            return
+        with self._db:
+            self._db.execute(_TABLE.format(name="clips_new"))
+            self._db.execute("INSERT INTO clips_new SELECT * FROM clips")
+            self._db.execute("DROP TABLE clips")
+            self._db.execute("ALTER TABLE clips_new RENAME TO clips")
 
     def __enter__(self) -> "State":
         return self
@@ -116,6 +129,13 @@ class State:
                 (error[:_MAX_ERROR], _now(), clip_id),
             )
 
+    def mark_skipped(self, clip_id: str, reason: str) -> None:
+        with self._db:
+            self._db.execute(
+                "UPDATE clips SET status = 'skipped', error = ?, updated_at = ? WHERE id = ?",
+                (reason[:_MAX_ERROR], _now(), clip_id),
+            )
+
     def unexported(self, account: str) -> list[ClipRow]:
         return self._rows("account = ? AND status = 'done'", (account,))
 
@@ -151,7 +171,8 @@ class State:
                       SUM(status = 'failed'),
                       SUM(status = 'failed' AND attempts >= ?),
                       SUM(status = 'exported'),
-                      SUM(status IN ('done', 'exported') AND chars < ?)
+                      SUM(status IN ('done', 'exported') AND chars < ?),
+                      SUM(status = 'skipped')
                FROM clips WHERE account = ?""",
             (max_attempts, low_text_chars, account),
         ).fetchone()

@@ -28,7 +28,7 @@ Exit codes: 0 ok, 1 stopped at an error (`error at line N (<line>): <reason>`), 
 | `wait` | blocks until the run ends; prints its last line |
 | `state` | `idle` (+ `last: …`) or `running @acc i/n` (+ `(stopping)`) |
 | `log [n]` | last n log lines (default 20) |
-| `status <account>` | counts, failures, low-text clips |
+| `status <account>` | counts, failures, low-text clips, skipped photo posts |
 | `export <account>` | writes unexported transcripts to `data/exports/`, prints paths |
 | `reset <account>` | requeue failed clips (refused during a run) |
 | `exports` | export files, newest first |

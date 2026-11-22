@@ -27,6 +27,7 @@ class RunSummary:
     done: int
     failed: int
     skipped_final: int
+    skipped: int = 0  # photo posts
 
 
 def clear_work(work_dir: Path) -> None:
@@ -47,7 +48,8 @@ def transcript_path(cfg: Config, account: str, clip_id: str) -> Path:
     return cfg.data_dir / "transcripts" / account / f"{clip_id}.txt"
 
 
-def process_clip(clip: ClipRow, cfg: Config, state: State, steps: Steps) -> tuple[bool, str]:
+def process_clip(clip: ClipRow, cfg: Config, state: State, steps: Steps) -> tuple[str, str]:
+    """Returns (outcome, message); outcome is done, failed or skipped."""
     work = cfg.work_dir / clip.id
     failed = False
     try:
@@ -61,12 +63,15 @@ def process_clip(clip: ClipRow, cfg: Config, state: State, steps: Steps) -> tupl
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(text, encoding="utf-8", newline="\n")
         state.mark_done(clip.id, len(text))
-        return True, f"done ({len(text)} chars)"
+        return "done", f"done ({len(text)} chars)"
+    except downloader.PhotoPost as e:
+        state.mark_skipped(clip.id, str(e))
+        return "skipped", f"skipped: {e}"
     except Exception as e:
         failed = True
         message = f"{type(e).__name__}: {e}"
         state.mark_failed(clip.id, message)
-        return False, f"failed: {message}"
+        return "failed", f"failed: {message}"
     finally:
         if not (failed and cfg.keep_failed_media):
             shutil.rmtree(work, ignore_errors=True)
@@ -92,7 +97,7 @@ def run_account(
             queue = queue[:limit]
         skipped_final = state.counts(account, cfg.max_attempts, cfg.low_text_chars).failed_final
 
-        done = failed = processed = 0
+        done = failed = skipped = processed = 0
         stopped = False
         if queue:
             out(f"queue: {len(queue)} clips")  # lets the UI show progress before the first clip ends
@@ -100,22 +105,21 @@ def run_account(
             if should_stop and should_stop():
                 stopped = True
                 break
-            ok, message = process_clip(clip, cfg, state, steps)
+            outcome, message = process_clip(clip, cfg, state, steps)
             processed += 1
-            done += ok
-            failed += not ok
+            done += outcome == "done"
+            failed += outcome == "failed"
+            skipped += outcome == "skipped"
             out(f"[{i}/{len(queue)}] {clip.id} {message}")
 
-    summary = RunSummary(listed_new, processed, done, failed, skipped_final)
+    summary = RunSummary(listed_new, processed, done, failed, skipped_final, skipped)
+    photos = f", {skipped} photo posts skipped" if skipped else ""
     if stopped:
-        out(f"@{account}: stopped after {processed}/{len(queue)} clips ({done} done, {failed} failed).")
+        out(f"@{account}: stopped after {processed}/{len(queue)} clips ({done} done, {failed} failed{photos}).")
     elif not queue:
         out(f"@{account}: nothing new to process ({listed_new} new clips listed).")
     else:
-        out(
-            f"@{account}: {done} done, {failed} failed, {listed_new} new clips listed"
-            + "."
-        )
+        out(f"@{account}: {done} done, {failed} failed{photos}, {listed_new} new clips listed.")
     if skipped_final:
         out(final_hint(account, skipped_final, cfg.max_attempts))
     return summary
