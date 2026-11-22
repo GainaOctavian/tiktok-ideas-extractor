@@ -1,0 +1,5 @@
+yt-dlp[default,curl-cffi]
+pytesseract
+opencv-python
+rapidfuzz
+pyyaml
