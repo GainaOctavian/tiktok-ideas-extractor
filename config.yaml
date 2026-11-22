@@ -1,0 +1,17 @@
+ocr_lang: eng                 # Tesseract language
+fps: 5                        # frames sampled per second (captions that change several times a second need 4-5)
+crop: {top: 0.62, bottom: 0.80, left: 0.03, right: 0.97}  # subtitle area, as fractions of the frame (calibrated for karaoke-style captions; spec default 0.35/0.85/0.05/0.95)
+text_mask: white              # white = white captions with outline (reads highlighted words too); otsu = other styles
+min_confidence: 60            # OCR words below this confidence are dropped
+dedupe_similarity: 85         # % similarity at which lines are merged
+frame_diff_threshold: 0.02    # frames differing less than this from the last kept one are skipped
+min_height: 720               # pick the smallest format whose short side is at least this
+cookies_from_browser: null    # e.g. chrome, only if TikTok blocks downloads
+impersonate: chrome           # browser impersonation for TikTok (needs curl_cffi); null to turn off
+keep_failed_media: false      # true = keep the media of failed clips in work/ for debugging
+tesseract_cmd: null           # e.g. C:\Program Files\Tesseract-OCR\tesseract.exe if not found automatically
+export_max_chars: 40000       # larger exports are split into numbered files
+max_attempts: 3               # failed clips are retried until this many attempts
+low_text_chars: 20            # clips with fewer transcript characters are flagged in status
+data_dir: data                # state.db, transcripts/, exports/
+work_dir: work                # temporary media, emptied after every clip

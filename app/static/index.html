@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TikTok Ideas Extractor</title>
+<style>
+  :root { --bg:#111418; --panel:#1c2128; --line:#2d333b; --text:#e6e8eb; --muted:#9aa4ae;
+          --blue:#2f81f7; --red:#da3633; --green:#3fb950; --amber:#d29922; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px 20px 40px; }
+  h1 { font-size: 1.3rem; margin: 0 0 18px; }
+  h2 { font-size: 1rem; margin: 26px 0 10px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  input { background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:8px 10px; font:inherit; }
+  input:focus { outline:2px solid var(--blue); outline-offset:-1px; }
+  button { border:0; border-radius:8px; padding:9px 15px; font:inherit; font-weight:600; cursor:pointer; color:var(--text); background:var(--line); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.primary { background:var(--blue); color:#fff; }
+  button.danger { background:var(--red); color:#fff; }
+  .status { color:var(--muted); margin:16px 0 6px; white-space:pre-wrap; }
+  .status .warn { color:var(--amber); }
+  .progress-label { color:var(--muted); font-size:.9rem; margin-top:10px; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:6px 0 4px; }
+  .bar > div { height:100%; width:0; background:var(--blue); transition: width .3s; }
+  .msg { min-height:1.4em; margin-top:10px; white-space:pre-wrap; font-size:.92rem; }
+  .msg.error { color:#ff7b72; } .msg.ok { color:var(--green); }
+  .log { background:#0b0d10; border-radius:8px; padding:10px 12px; font:13px/1.5 Consolas, monospace; color:#b6c0ca;
+         height:260px; overflow:auto; white-space:pre-wrap; word-break:break-all; }
+  .log .fail { color:#ff7b72; } .log .start { color:var(--blue); } .log .done { color:#b6c0ca; }
+  .exports { display:flex; flex-direction:column; gap:6px; }
+  .export { display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--panel); border-radius:8px; padding:8px 10px; }
+  .export .name { word-break:break-all; } .muted { color:var(--muted); }
+  .export button { padding:6px 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TikTok Ideas Extractor</h1>
+
+  <div class="row">
+    <input id="account" aria-label="Account" list="recent" placeholder="TikTok account name" style="width:240px" autocomplete="off">
+    <datalist id="recent"></datalist>
+    <input id="limit" aria-label="Limit" type="number" min="1" placeholder="limit (optional)" style="width:150px">
+    <button id="run" class="primary">Run</button>
+    <button id="stop" class="danger" disabled>Stop</button>
+    <button id="export">Export</button>
+    <button id="reset">Reset failed</button>
+  </div>
+
+  <div id="status" class="status">Enter an account to see its status.</div>
+  <div id="progress-label" class="progress-label">Idle</div>
+  <div class="bar"><div id="bar"></div></div>
+  <div id="msg" class="msg"></div>
+
+  <h2>Log</h2>
+  <div id="log" class="log"></div>
+
+  <h2>Exports</h2>
+  <div id="exports" class="exports"><span class="muted">No exports yet.</span></div>
+</main>
+
+<script>
+const token = new URLSearchParams(location.search).get("t") || "";
+const $ = (id) => document.getElementById(id);
+let since = 0, running = false, lastStatusAt = 0, wasRunning = false;
+
+async function cmd(script) {
+  const r = await fetch("/api/cmd", { method: "POST", headers: { "X-Token": token }, body: script });
+  return { text: await r.text(), ok: r.headers.get("X-Exit") === "0" && r.ok };
+}
+
+function account() { return $("account").value.trim(); }
+function quoted(a) { return '"' + a.replace(/"/g, "") + '"'; }
+
+function showMsg(text, ok) {
+  $("msg").textContent = text;
+  $("msg").className = "msg " + (ok ? "ok" : "error");
+}
+
+function rememberAccount(a) {
+  const list = JSON.parse(localStorage.getItem("recentAccounts") || "[]").filter((x) => x !== a);
+  list.unshift(a);
+  localStorage.setItem("recentAccounts", JSON.stringify(list.slice(0, 8)));
+  loadRecent();
+}
+
+function loadRecent() {
+  const list = JSON.parse(localStorage.getItem("recentAccounts") || "[]");
+  $("recent").innerHTML = list.map((a) => `<option value="${a.replace(/"/g, "&quot;")}">`).join("");
+  const fromLink = new URLSearchParams(location.search).get("a");  // bookmarkable: ...&a=youraccount
+  if (!account()) $("account").value = fromLink || list[0] || "";
+}
+
+async function refreshStatus() {
+  lastStatusAt = Date.now();
+  const a = account();
+  if (!a) return;
+  const { text, ok } = await cmd(`status ${quoted(a)}`);
+  const el = $("status");
+  el.textContent = "";
+  text.split("\n").forEach((line, i) => {
+    const span = document.createElement("div");
+    span.textContent = line;
+    if (!ok || line.startsWith("failed:") || line.includes("Requeue")) span.className = "warn";
+    el.appendChild(span);
+  });
+}
+
+async function refreshExports() {
+  const { text } = await cmd("exports");
+  const box = $("exports");
+  box.innerHTML = "";
+  if (text.trim() === "no exports") { box.innerHTML = '<span class="muted">No exports yet.</span>'; return; }
+  text.split("\n").forEach((line) => {
+    const [name, size] = line.split(/\s{2,}/);
+    const row = document.createElement("div");
+    row.className = "export";
+    row.innerHTML = `<span class="name"></span><span class="row"><button data-act="open">Open</button><button class="primary" data-act="copy">Copy</button></span>`;
+    row.querySelector(".name").innerHTML = "";
+    row.querySelector(".name").append(name, Object.assign(document.createElement("span"), { className: "muted", textContent: "  · " + size }));
+    row.querySelector('[data-act="open"]').onclick = () => window.open(`/api/export/${encodeURIComponent(name)}?t=${token}`, "_blank");
+    row.querySelector('[data-act="copy"]').onclick = async (e) => {
+      try {
+        const r = await fetch(`/api/export/${encodeURIComponent(name)}`, { headers: { "X-Token": token } });
+        if (!r.ok) throw new Error(`the app answered ${r.status}`);
+        await navigator.clipboard.writeText(await r.text());
+        e.target.textContent = "Copied";
+        setTimeout(() => (e.target.textContent = "Copy"), 1500);
+      } catch (err) {
+        showMsg(`Could not copy ${name}: ${err.message}. Use Open and copy from there.`, false);
+      }
+    };
+    box.appendChild(row);
+  });
+}
+
+function appendLog(lines) {
+  const log = $("log");
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
+  for (const line of lines) {
+    const div = document.createElement("div");
+    div.textContent = line;
+    if (line.startsWith("> ")) div.className = "start";
+    else if (line.includes(" failed:") || line.startsWith("error:")) div.className = "fail";
+    log.appendChild(div);
+  }
+  while (log.childElementCount > 500) log.firstChild.remove();
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+function setButtons() {
+  $("run").disabled = running;
+  $("stop").disabled = !running;
+  $("reset").disabled = running;
+}
+
+async function poll() {
+  try {
+    const r = await fetch(`/api/poll?since=${since}`, { headers: { "X-Token": token } });
+    if (r.status === 403) { $("progress-label").textContent = "Wrong or missing token: open the link printed in the terminal."; return; }
+    const data = await r.json();
+    since = data.next;
+    appendLog(data.log);
+    const st = data.state;
+    running = st.running;
+    if (st.running) {
+      const pct = st.total ? Math.round((st.done / st.total) * 100) : 0;
+      $("bar").style.width = pct + "%";
+      $("progress-label").textContent = (st.total
+        ? `Running @${st.account}: ${st.done} / ${st.total}`
+        : `Running @${st.account}: listing clips...`) + (st.stopping ? " (stopping after the current clip)" : "");
+      if (Date.now() - lastStatusAt > 5000) refreshStatus();
+    } else {
+      $("progress-label").textContent = st.last ? `Idle. Last run: ${st.last}` : "Idle";
+      if (!st.total) $("bar").style.width = "0";
+      if (wasRunning) { refreshStatus(); refreshExports(); }
+    }
+    wasRunning = running;
+    setButtons();
+  } catch (e) {
+    $("progress-label").textContent = "The app is not responding. Is the terminal window still open?";
+  } finally {
+    setTimeout(poll, 1000);
+  }
+}
+
+$("run").onclick = async () => {
+  const a = account();
+  if (!a) return showMsg("Enter an account first.", false);
+  const limit = $("limit").value.trim();
+  const { text, ok } = await cmd(`run ${quoted(a)}${limit ? " " + limit : ""}`);
+  showMsg(text, ok);
+  if (ok) { rememberAccount(a); running = true; setButtons(); }
+};
+$("stop").onclick = async () => { const { text, ok } = await cmd("stop"); showMsg(text, ok); };
+$("export").onclick = async () => {
+  const a = account();
+  if (!a) return showMsg("Enter an account first.", false);
+  const { text, ok } = await cmd(`export ${quoted(a)}`);
+  showMsg(text, ok);
+  refreshStatus(); refreshExports();
+};
+$("reset").onclick = async () => {
+  const a = account();
+  if (!a) return showMsg("Enter an account first.", false);
+  const { text, ok } = await cmd(`reset ${quoted(a)}`);
+  showMsg(text, ok);
+  refreshStatus();
+};
+$("account").addEventListener("change", refreshStatus);
+
+loadRecent();
+refreshStatus();
+refreshExports();
+poll();
+</script>
+</body>
+</html>

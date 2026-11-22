@@ -1,0 +1,14 @@
+docs/claude-plans/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Runtime data (state DB, transcripts, exports, temp media)
+data/
+work/
+
+# OpenChamber screenshots
+.openchamber/
