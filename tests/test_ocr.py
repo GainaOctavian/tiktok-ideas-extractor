@@ -15,19 +15,55 @@ def text_image(text, fg=255, bg=0, h=120, w=900):
     return img
 
 
-def test_preprocess_doubles_size_and_is_binary():
+@pytest.mark.parametrize("mode", ["white", "otsu"])
+def test_preprocess_doubles_size_and_is_binary(mode):
     img = np.random.default_rng(0).integers(0, 256, (50, 100, 3)).astype(np.uint8)
-    out = preprocess(img)
+    out = preprocess(img, mode)
     assert out.shape == (100, 200)
     assert set(np.unique(out)) <= {0, 255}
 
 
-def test_preprocess_inverts_light_text_on_dark():
-    assert preprocess(text_image("ADD A PET")).mean() > 127
+@pytest.mark.parametrize("mode", ["white", "otsu"])
+def test_preprocess_inverts_light_text_on_dark(mode):
+    assert preprocess(text_image("ADD A PET"), mode).mean() > 127
 
 
-def test_preprocess_keeps_dark_text_on_light():
-    assert preprocess(text_image("ADD A PET", fg=0, bg=255)).mean() > 127
+def test_otsu_keeps_dark_text_on_light():
+    assert preprocess(text_image("ADD A PET", fg=0, bg=255), "otsu").mean() > 127
+
+
+def test_white_mask_keeps_white_text_on_red_highlight():
+    # karaoke captions: the current word is white on a red box
+    img = np.full((120, 900, 3), (200, 180, 160), dtype=np.uint8)  # beige-ish background
+    cv2.rectangle(img, (0, 20), (450, 110), (60, 40, 230), -1)  # red box (BGR)
+    cv2.putText(img, "ROBLOX", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (255, 255, 255), 3)
+    cv2.putText(img, "GAME", (500, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (255, 255, 255), 3)
+    out = preprocess(img, "white")
+    left, right = out[:, :900], out[:, 1000:]
+    # text pixels (dark) exist on both the red box and the background, and nothing else is dark
+    assert (left == 0).mean() > 0.02 and (right == 0).mean() > 0.02
+    assert (out == 0).mean() < 0.25
+
+
+def test_white_mask_ignores_saturated_colors():
+    img = np.full((60, 100, 3), (60, 40, 230), dtype=np.uint8)  # all red, no text
+    assert (preprocess(img, "white") == 0).mean() == 0
+
+
+def test_unknown_mode_rejected():
+    with pytest.raises(ValueError):
+        preprocess(text_image("x"), "magic")
+
+
+@pytest.mark.needs_tesseract
+def test_real_ocr_reads_highlighted_word(tmp_path, cfg):
+    configure_tesseract(cfg)
+    img = np.full((120, 900, 3), (40, 40, 40), dtype=np.uint8)
+    cv2.rectangle(img, (0, 25), (330, 105), (60, 40, 230), -1)
+    cv2.putText(img, "ROBLOX GAME TOGETHER", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (255, 255, 255), 4)
+    path = tmp_path / "f.png"
+    cv2.imwrite(str(path), img)
+    assert "ROBLOX" in " ".join(ocr_frame(path, cfg)).upper()
 
 
 def fake_data(words, confs, lines=None):

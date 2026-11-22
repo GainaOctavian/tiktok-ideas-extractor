@@ -73,8 +73,14 @@ def process_clip(clip: ClipRow, cfg: Config, state: State, steps: Steps) -> tupl
 
 
 def run_account(
-    account: str, cfg: Config, limit: int | None, steps: Steps | None = None, out: Callable = print
+    account: str,
+    cfg: Config,
+    limit: int | None,
+    steps: Steps | None = None,
+    out: Callable = print,
+    should_stop: Callable[[], bool] | None = None,
 ) -> RunSummary:
+    """Process the account's queue; should_stop is checked before each clip (cooperative stop)."""
     steps = steps or Steps()
     clear_work(cfg.work_dir)
     clips = steps.list_clips(account, cfg)
@@ -86,15 +92,24 @@ def run_account(
             queue = queue[:limit]
         skipped_final = state.counts(account, cfg.max_attempts, cfg.low_text_chars).failed_final
 
-        done = failed = 0
+        done = failed = processed = 0
+        stopped = False
+        if queue:
+            out(f"queue: {len(queue)} clips")  # lets the UI show progress before the first clip ends
         for i, clip in enumerate(queue, 1):
+            if should_stop and should_stop():
+                stopped = True
+                break
             ok, message = process_clip(clip, cfg, state, steps)
+            processed += 1
             done += ok
             failed += not ok
             out(f"[{i}/{len(queue)}] {clip.id} {message}")
 
-    summary = RunSummary(listed_new, len(queue), done, failed, skipped_final)
-    if not queue:
+    summary = RunSummary(listed_new, processed, done, failed, skipped_final)
+    if stopped:
+        out(f"@{account}: stopped after {processed}/{len(queue)} clips ({done} done, {failed} failed).")
+    elif not queue:
         out(f"@{account}: nothing new to process ({listed_new} new clips listed).")
     else:
         out(

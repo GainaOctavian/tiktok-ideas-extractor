@@ -21,6 +21,7 @@ class Config:
     ocr_lang: str = "eng"
     fps: float = 1
     crop: Crop = field(default_factory=lambda: Crop(0.35, 0.85, 0.05, 0.95))
+    text_mask: str = "white"
     min_confidence: int = 60
     dedupe_similarity: int = 85
     frame_diff_threshold: float = 0.02
@@ -68,6 +69,8 @@ def load_config(path: Path) -> Config:
     c = cfg.crop
     if not (0 <= c.top < c.bottom <= 1 and 0 <= c.left < c.right <= 1):
         raise ValueError("crop must satisfy 0 <= top < bottom <= 1 and 0 <= left < right <= 1")
+    if cfg.text_mask not in ("white", "otsu"):
+        raise ValueError("text_mask must be white or otsu")
     if cfg.fps <= 0:
         raise ValueError("fps must be greater than 0")
     return cfg

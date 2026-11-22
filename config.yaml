@@ -1,6 +1,7 @@
 ocr_lang: eng                 # Tesseract language
-fps: 1                        # frames sampled per second
-crop: {top: 0.35, bottom: 0.85, left: 0.05, right: 0.95}  # subtitle area, as fractions of the frame
+fps: 5                        # frames sampled per second (captions that change several times a second need 4-5)
+crop: {top: 0.62, bottom: 0.80, left: 0.03, right: 0.97}  # subtitle area, as fractions of the frame (calibrated on @momentumcash; spec default 0.35/0.85/0.05/0.95)
+text_mask: white              # white = white captions with outline (reads highlighted words too); otsu = other styles
 min_confidence: 60            # OCR words below this confidence are dropped
 dedupe_similarity: 85         # % similarity at which lines are merged
 frame_diff_threshold: 0.02    # frames differing less than this from the last kept one are skipped

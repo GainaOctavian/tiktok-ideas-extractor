@@ -9,7 +9,11 @@ Windows CLI that lists every clip of a TikTok account, OCRs the on-screen subtit
 - `pipeline/state.py`: SQLite `State`, `ClipInfo`, `ClipRow`.
 - `pipeline/lister.py` / `downloader.py`: yt-dlp Python API; `base_options` holds the shared options (silent logger, cookies, impersonation).
 - `pipeline/frames.py`, `ocr.py`, `cleaner.py`, `exporter.py`: one step each.
-- `pipeline/runner.py`: per-clip loop; steps injected via `Steps` (fakes in `tests/test_runner.py`).
+- `pipeline/runner.py`: per-clip loop; steps injected via `Steps` (fakes in `tests/test_runner.py`); `should_stop` for cooperative stop.
+- `pipeline/report.py`: status/export/reset answers shared by CLI, page and ctl.
+- `app/commands.py`: the line-based command language (the ctl). Page buttons and `tiktok_ideas_ctl.py` both send these lines to `POST /api/cmd`. A new feature = a new command here + help text + test + the skill.
+- `app/jobs.py`: one background run, in-memory log. `app/server.py`: 127.0.0.1 server, token on every request, `ctl.json` only with `--ctl`. `app/static/index.html`: the page.
+- `.claude/skills/tiktok-ideas/SKILL.md`: ctl cheat sheet, keep it in sync with `COMMANDS`.
 
 ## Running
 

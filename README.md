@@ -14,7 +14,15 @@ py -3 -m venv .venv
 
 Open a new terminal afterwards so `ffmpeg` is on PATH. If Tesseract is not found, set `tesseract_cmd` in `config.yaml`.
 
-## Use
+## Use the page
+
+```powershell
+.\.venv\Scripts\python.exe tiktok_ideas.py ui
+```
+
+The page opens in your browser. Enter the account, press **Run** (optionally with a limit), watch the progress, press **Export** at the end and **Copy** to paste the export into Claude. **Stop** finishes the current clip and ends the run. Keep the terminal window open while you use the page; Ctrl+C there closes it. Add `&a=<account>` to the link to open it with the account filled in.
+
+## Use the terminal
 
 In PowerShell an unquoted `@name` is dropped (splatting), so write the account without `@` or quote it: `'@name'`.
 
@@ -36,6 +44,16 @@ Everything that varies between accounts is in `config.yaml` (subtitle `crop`, `f
 
 1. `.\.venv\Scripts\python.exe -m pip install -U "yt-dlp[default,curl-cffi]"`
 2. Set `cookies_from_browser: chrome` (or another browser) in `config.yaml`.
+
+## Drive it by script (ctl)
+
+Start the page with `ui --ctl`, then send command lines from another terminal:
+
+```powershell
+.\.venv\Scripts\python.exe tiktok_ideas_ctl.py "run momentumcash 5" wait "status momentumcash"
+```
+
+`help` lists the commands. The page's buttons send the same lines. Details: `.claude/skills/tiktok-ideas/SKILL.md`.
 
 ## Develop
 

@@ -9,3 +9,6 @@ __pycache__/
 # Runtime data (state DB, transcripts, exports, temp media)
 data/
 work/
+
+# OpenChamber screenshots
+.openchamber/

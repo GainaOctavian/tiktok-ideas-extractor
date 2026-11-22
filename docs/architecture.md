@@ -33,6 +33,19 @@ stateDiagram-v2
 
 A clip with 3 failed attempts stays `failed` and is skipped until `reset --failed`.
 
+## Page and ctl
+
+```mermaid
+flowchart LR
+    P["Browser page<br/>app/static/index.html"] -- "command lines + token" --> S["app/server.py<br/>127.0.0.1"]
+    C["tiktok_ideas_ctl.py"] -- "same lines, token from data/ctl.json" --> S
+    S --> K["app/commands.py<br/>run · stop · wait · state · log · status · export · reset · exports · help"]
+    K --> J["app/jobs.py<br/>one background run, log"] --> R["pipeline.runner.run_account"]
+    K --> T["pipeline.report<br/>status / export / reset text"]
+```
+
+The page polls `GET /api/poll` (state + new log lines) every second; everything else goes through `POST /api/cmd`, so the page can do nothing the ctl can't.
+
 ## Data
 
 `data/state.db` (SQLite), table `clips`: `id` (TikTok id, time-ordered), `account`, `url`, `title`, `published`, `status`, `error`, `attempts`, `chars` (transcript length, used for the "low text" flag), `updated_at`.
@@ -43,4 +56,6 @@ Exports are `data/exports/<account>-<date>-<time>[-N].txt`: a TASK line for Clau
 
 - yt-dlp needs browser impersonation for TikTok (`curl_cffi`, config `impersonate: chrome`). yt-dlp's automatic target breaks profile listing, so a target is always set explicitly.
 - `curl_cffi` has no wheels for 32-bit Python on Windows: use 64-bit Python.
+- OCR preprocessing defaults to `text_mask: white`: only near-white, unsaturated pixels count as text. TikTok captions are white with a dark outline, often karaoke-style with the current word on a colored box; a plain Otsu threshold loses that word (measured on @momentumcash: 88% → 95–97% word recall). `otsu` stays available for other caption styles.
+- The cleaner also strips OCR specks at line ends, reads `0` inside a word as `O`, and drops lines that are pieces of a recent line.
 - Frame de-duplication compares the busiest 20 px cell (on a 160 px-wide copy), not the whole-frame mean, so a one-word subtitle change on a static background still counts.

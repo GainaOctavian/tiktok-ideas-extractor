@@ -89,8 +89,18 @@ def test_run_command(tmp_path, config, capsys, monkeypatch):
     monkeypatch.setattr(tiktok_ideas, "make_steps", Fakes(["1", "2"]).steps)
     code, out, _ = call(capsys, "--config", str(config), "run", "@cont", "--limit", "1")
     assert code == 0
-    assert out.splitlines()[0].startswith("[1/1] 2 done")
+    assert out.splitlines()[1].startswith("[1/1] 2 done")
     assert (tmp_path / "data" / "transcripts" / "cont" / "2.txt").exists()
+
+
+def test_ui_command(tmp_path, config, monkeypatch):
+    calls = {}
+    monkeypatch.setattr(tiktok_ideas, "serve_ui", lambda cfg, port, open_browser, ctl: calls.update(
+        data_dir=cfg.data_dir, port=port, open_browser=open_browser, ctl=ctl))
+    assert tiktok_ideas.main(["--config", str(config), "ui", "--port", "8765", "--no-browser", "--ctl"]) == 0
+    assert calls == {"data_dir": tmp_path / "data", "port": 8765, "open_browser": False, "ctl": True}
+    assert tiktok_ideas.main(["--config", str(config), "ui"]) == 0
+    assert calls["port"] == 0 and calls["open_browser"] is True and calls["ctl"] is False
 
 
 def test_listing_error_exit_1(config, capsys, monkeypatch):

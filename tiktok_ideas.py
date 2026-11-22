@@ -6,16 +6,15 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from app.server import serve_ui
 from pipeline.config import Config, load_config
-from pipeline.exporter import write_export
 from pipeline.frames import FfmpegMissing, require_ffmpeg
 from pipeline.lister import ListingError, normalize_account
 from pipeline.ocr import TesseractMissing, configure_tesseract
-from pipeline.runner import Steps, final_hint, run_account
-from pipeline.state import State
+from pipeline.report import export_lines, reset_line, status_lines
+from pipeline.runner import Steps, run_account
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent / "config.yaml"
-MAX_LISTED_IDS = 20
 
 make_steps = Steps  # replaced in tests
 
@@ -44,56 +43,32 @@ def _parser() -> argparse.ArgumentParser:
     reset = sub.add_parser("reset", help="requeue clips")
     reset.add_argument("account", nargs="?", default="")
     reset.add_argument("--failed", action="store_true", required=True, help="requeue failed clips")
+
+    ui = sub.add_parser("ui", help="open the local web page")
+    ui.add_argument("--port", type=int, default=0, help="port on 127.0.0.1 (default: a free one)")
+    ui.add_argument("--no-browser", action="store_true", help="don't open the browser")
+    ui.add_argument("--ctl", action="store_true", help="let tiktok_ideas_ctl.py drive the app")
     return p
 
 
-def _ids(rows) -> str:
-    ids = [r.id for r in rows]
-    more = len(ids) - MAX_LISTED_IDS
-    return ", ".join(ids[:MAX_LISTED_IDS]) + (f" and {more} more" if more > 0 else "")
-
-
 def cmd_status(account: str, cfg: Config) -> None:
-    with State(cfg.data_dir / "state.db") as state:
-        c = state.counts(account, cfg.max_attempts, cfg.low_text_chars)
-        if c.listed == 0:
-            print(f"@{account}: no clips yet. Run: python tiktok_ideas.py run @{account}")
-            return
-        print(
-            f"@{account}: {c.listed} listed | {c.done + c.exported} processed ({c.low_text} low text) | "
-            f"{c.done} unexported | {c.exported} exported | "
-            f"{c.failed} failed ({c.failed_final} final) | {c.pending} pending"
-        )
-        for row in state.failed(account):
-            print(f"failed: {row.id} ({row.attempts}/{cfg.max_attempts}) {row.error}")
-        if c.failed_final:
-            print(final_hint(account, c.failed_final, cfg.max_attempts))
-        low = state.low_text(account, cfg.low_text_chars)
-        if low:
-            print(f"low text: {_ids(low)}")
+    print("\n".join(status_lines(account, cfg)))
 
 
 def cmd_export(account: str, cfg: Config) -> None:
-    with State(cfg.data_dir / "state.db") as state:
-        paths, count = write_export(account, cfg, state, date.today())
-    if count == 0:
-        print("Nothing to export.")
-        return
-    for path in paths:
-        print(path)
-    if not paths:
-        print("No transcript had text.")
-    print(f"{count} clips exported")
+    print("\n".join(export_lines(account, cfg, date.today())))
 
 
 def cmd_reset(account: str, cfg: Config) -> None:
-    with State(cfg.data_dir / "state.db") as state:
-        print(f"{state.reset_failed(account)} failed clips requeued")
+    print(reset_line(account, cfg))
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command == "ui":
+            serve_ui(load_config(args.config), args.port, not args.no_browser, args.ctl)
+            return 0
         if not args.account.strip():
             raise UsageError(
                 "missing account. In PowerShell an unquoted @name is dropped: "

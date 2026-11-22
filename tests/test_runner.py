@@ -49,7 +49,7 @@ class Fakes:
         clip_id = path.parent.parent.name
         if clip_id in self.interrupt_ocr:
             raise KeyboardInterrupt
-        return self.lines.get(clip_id, [f"idea number {clip_id}", f"idea number {clip_id}"])
+        return self.lines.get(clip_id, [f"idea number {clip_id} here", f"idea number {clip_id} here"])
 
     def steps(self):
         return Steps(self.list_clips, self.download, self.extract_frames, self.ocr_frame)
@@ -73,10 +73,10 @@ def test_run_end_to_end_with_fakes(cfg, tmp_path):
     summary, out = run(cfg, Fakes([1, 2, 3]))
     assert (summary.listed_new, summary.processed, summary.done, summary.failed) == (3, 3, 3, 0)
     text = (cfg.data_dir / "transcripts" / "cont" / "2.txt").read_text(encoding="utf-8")
-    assert text == "idea number 2"
+    assert text == "idea number 2 here"
     assert list(cfg.work_dir.iterdir()) == []
     assert media_files(tmp_path) == []
-    assert out[0].startswith("[1/3] 3 done (")
+    assert out[0] == "queue: 3 clips" and out[1].startswith("[1/3] 3 done (")
 
 
 def test_second_run_only_new(cfg):
@@ -156,6 +156,28 @@ def test_listing_error_writes_nothing(cfg):
         run(cfg, fakes)
     with state(cfg) as s:
         assert s.counts("cont", 3, 20).listed == 0
+
+
+def test_queue_size_logged_before_first_clip(cfg):
+    _, out = run(cfg, Fakes([1, 2, 3]), limit=2)
+    assert out[0] == "queue: 2 clips"
+    assert out[1].startswith("[1/2]")
+
+
+def test_should_stop_ends_after_current_clip(cfg):
+    fakes = Fakes([1, 2, 3])
+    stop = {"now": False}
+    real_ocr = fakes.ocr_frame
+
+    def ocr_and_request_stop(path, c):
+        stop["now"] = True
+        return real_ocr(path, c)
+
+    fakes.ocr_frame = ocr_and_request_stop
+    out = []
+    summary = run_account("cont", cfg, None, fakes.steps(), out=out.append, should_stop=lambda: stop["now"])
+    assert summary.processed == 1 and summary.done == 1
+    assert "stopped after 1/3" in out[-1]
 
 
 def test_clear_work_only_removes_clip_folders(tmp_path):

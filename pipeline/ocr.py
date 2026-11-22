@@ -39,9 +39,31 @@ def configure_tesseract(cfg: Config) -> None:
         )
 
 
-def preprocess(img: np.ndarray) -> np.ndarray:
-    """Grayscale, 2x upscale, Otsu threshold; returns dark text on a light background."""
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+TEXT_MASKS = ("white", "otsu")
+_WHITE_MAX_SATURATION = 70
+_WHITE_MIN_VALUE = 200
+
+
+def preprocess(img: np.ndarray, mode: str = "white") -> np.ndarray:
+    """2x upscale + binarize; returns dark text on a light background.
+
+    white: keep only near-white pixels (TikTok captions are white with a dark outline),
+           which also reads words highlighted on a colored box.
+    otsu:  grayscale + Otsu threshold, for other caption styles.
+    """
+    if mode not in TEXT_MASKS:
+        raise ValueError(f"text_mask must be one of {', '.join(TEXT_MASKS)}, not {mode!r}")
+    if img.ndim == 2:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    if mode == "white":
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        mask = ((hsv[..., 1] < _WHITE_MAX_SATURATION) & (hsv[..., 2] > _WHITE_MIN_VALUE)).astype(np.uint8) * 255
+        big = cv2.resize(mask, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        _, binary = cv2.threshold(big, 127, 255, cv2.THRESH_BINARY)
+        return cv2.bitwise_not(binary)
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     big = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
     _, binary = cv2.threshold(big, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     if binary.mean() < 127:
@@ -51,7 +73,7 @@ def preprocess(img: np.ndarray) -> np.ndarray:
 
 def ocr_frame(path: Path, cfg: Config) -> list[str]:
     data = pytesseract.image_to_data(
-        preprocess(read_image(path)),
+        preprocess(read_image(path), cfg.text_mask),
         lang=cfg.ocr_lang,
         config="--psm 6",
         output_type=pytesseract.Output.DICT,
